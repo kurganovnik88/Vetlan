@@ -56,8 +56,8 @@ BYBIT_CONFIG = {
     "atr_min": 0.0005,
     "atr_max": 0.02,
 
-    "volume_sma": 20,
-    "volume_mult": 1.5,
+    "volume_sma": 15,
+    "volume_mult": 1.2,
 
     "rsi_period": 14,
 
