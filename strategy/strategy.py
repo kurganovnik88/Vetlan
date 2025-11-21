@@ -176,6 +176,7 @@ class Strategy:
 
             # расширенный лог
             decisions = []
+            decisions.append(f"Price={last_price:.4f}")  # Текущая рыночная цена
             decisions.append(f"RSI={rsi:.2f}")
 
             if ema50 is not None:
