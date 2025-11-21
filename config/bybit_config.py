@@ -83,7 +83,7 @@ BYBIT_CONFIG = {
 
     "risk_pct": 2,
     "min_order_usdt": 5,
-    "max_position_pct": 10,  # Максимальный размер позиции в % от баланса
+    "max_position_pct": 15,  # Максимальный размер позиции в % от баланса (увеличено для малых балансов)
 
     "telegram_token": os.getenv("TELEGRAM_TOKEN"),
     "telegram_chat_id": os.getenv("TELEGRAM_CHAT_ID"),

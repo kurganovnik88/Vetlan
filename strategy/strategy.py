@@ -346,7 +346,11 @@ class Strategy:
                 sl_max_based = max_recent_high + atr * 0.5  # Буфер 0.5 ATR
                 
                 # Берем максимальное значение из всех вариантов (самый безопасный SL)
-                sl = max(sl_atr_based, sl_percent_based, sl_max_based)
+                # Но ограничиваем максимальным расстоянием, чтобы не было слишком большого SL для малых балансов
+                sl_candidate = max(sl_atr_based, sl_percent_based, sl_max_based)
+                # Ограничиваем SL максимум 5% от цены входа (для малых балансов)
+                sl_max_distance = entry * 0.05
+                sl = min(sl_candidate, entry + sl_max_distance)
 
                 pattern_info = ", Upthrust OK" if self.enable_patterns else ""
                 trend_info_parts = []
