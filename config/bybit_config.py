@@ -52,6 +52,7 @@ BYBIT_CONFIG = {
     ],
 
     "ema_period": 50,
+    "ema20_period": 20,  # EMA20 для дополнительного подтверждения тренда
     "atr_period": 14,
     "atr_min": 0.0005,
     "atr_max": 0.02,
@@ -62,7 +63,7 @@ BYBIT_CONFIG = {
     "rsi_period": 14,
 
     "rsi_buy": 25,
-    "rsi_sell": 70,  # Средняя частота: снижено с 75 до 70
+    "rsi_sell": 55,  # SHORT: RSI < 55 (избегаем перекупленности, по ТЗ)
 
     "tp_long_atr": 2.5,
     "sl_long_atr": 1.2,

@@ -30,6 +30,7 @@ class Strategy:
         self.rsi_short = settings.get("rsi_sell", 70)
 
         self.ema_period = settings.get("ema_period", 50)
+        self.ema20_period = settings.get("ema20_period", 20)
         self.vol_sma_period = settings.get("volume_sma", 20)
         self.atr_period = settings.get("atr_period", 14)
         self.min_vol_mult = settings.get("volume_mult", 1.0)
@@ -138,6 +139,7 @@ class Strategy:
             # ----------------------------
             rsi = calc_rsi(c, self.rsi_period)
             ema50 = calc_ema(c, self.ema_period)
+            ema20 = calc_ema(c, self.ema20_period)
             atr = calc_atr(h, l, c, self.atr_period)
             vol_sma = calc_volume_sma(v, self.vol_sma_period)
 
@@ -178,6 +180,11 @@ class Strategy:
             decisions = []
             decisions.append(f"Price={last_price:.4f}")  # Текущая рыночная цена
             decisions.append(f"RSI={rsi:.2f}")
+
+            if ema20 is not None:
+                decisions.append(f"EMA{self.ema20_period}={ema20:.4f}")
+            else:
+                decisions.append(f"EMA{self.ema20_period}=n/a")
 
             if ema50 is not None:
                 decisions.append(f"EMA{self.ema_period}={ema50:.4f}")
@@ -273,7 +280,8 @@ class Strategy:
             # =====================================================
             #                   ШОРТ (Sell)
             # =====================================================
-            if self.enable_short and rsi > self.rsi_short:
+            # Изменено: RSI < 55 (избегаем перекупленности, по ТЗ)
+            if self.enable_short and rsi < self.rsi_short:
                 # Проверка объёма
                 if vol_sma and v[-1] < vol_sma * self.min_vol_mult:
                     return (
@@ -288,14 +296,24 @@ class Strategy:
                         },
                     )
 
-                # Фильтр тренда по EMA50
-                if self.use_trend_filter and ema50 is not None:
-                    if last_price > ema50:
+                # Фильтр тренда по EMA50 и EMA20
+                if self.use_trend_filter:
+                    if ema50 is not None and last_price > ema50:
                         return (
                             symbol,
                             None,
                             {
                                 "message": f"SHORT отклонён: цена выше EMA50 (восходящий тренд). Цена: {last_price:.4f}, EMA50: {ema50:.4f}",
+                                "indicators": decisions,
+                            },
+                        )
+                    # Дополнительное подтверждение: EMA20 должна быть ниже EMA50
+                    if ema20 is not None and ema50 is not None and ema20 > ema50:
+                        return (
+                            symbol,
+                            None,
+                            {
+                                "message": f"SHORT отклонён: EMA20 выше EMA50 (нет подтверждения нисходящего тренда). EMA20: {ema20:.4f}, EMA50: {ema50:.4f}",
                                 "indicators": decisions,
                             },
                         )
@@ -317,13 +335,26 @@ class Strategy:
                     entry - atr * self.tp_short_atr,
                     entry * (1 - self.min_tp_pct),
                 )
-                sl = max(
-                    entry + atr * self.sl_short_atr,
-                    entry * (1 + self.min_sl_pct),
-                )
+                
+                # Улучшенный SL: используем максимум последних 5 свечей + буфер ATR
+                # Это соответствует ТЗ: "SL выше последнего значимого максимума"
+                recent_highs = h[-5:] if len(h) >= 5 else h
+                max_recent_high = float(np.max(recent_highs))
+                sl_atr_based = entry + atr * self.sl_short_atr
+                sl_percent_based = entry * (1 + self.min_sl_pct)
+                sl_max_based = max_recent_high + atr * 0.5  # Буфер 0.5 ATR
+                
+                # Берем максимальное значение из всех вариантов (самый безопасный SL)
+                sl = max(sl_atr_based, sl_percent_based, sl_max_based)
 
                 pattern_info = ", Upthrust OK" if self.enable_patterns else ""
-                trend_info = f", цена ниже EMA50 ({last_price:.4f} < {ema50:.4f})" if (self.use_trend_filter and ema50) else ""
+                trend_info_parts = []
+                if self.use_trend_filter:
+                    if ema50 is not None:
+                        trend_info_parts.append(f"цена ниже EMA50 ({last_price:.4f} < {ema50:.4f})")
+                    if ema20 is not None and ema50 is not None:
+                        trend_info_parts.append(f"EMA20 ниже EMA50 ({ema20:.4f} < {ema50:.4f})")
+                trend_info = ", " + ", ".join(trend_info_parts) if trend_info_parts else ""
                 return (
                     symbol,
                     "short",
