@@ -1,0 +1,190 @@
+import logging
+from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
+
+
+class RSICalculator:
+    """
+    Универсальный модуль индикаторов.
+    Использует клиент pybit (unified_trading.HTTP), который ты ему передаёшь.
+    """
+
+    def __init__(self, client):
+        self.client = client
+
+    # --- Работа со свечами ---
+
+    def _fetch_klines(
+        self,
+        symbol: str,
+        interval: str,
+        limit: int = 200,
+        category: str = "linear",
+    ) -> List[List[str]]:
+        """
+        Возвращает сырые свечи Bybit v5:
+        [startTime, open, high, low, close, volume, turnover]
+        """
+        try:
+            resp = self.client.get_kline(
+                category=category,
+                symbol=symbol,
+                interval=interval,
+                limit=limit,
+            )
+            result = resp.get("result", {})
+            klines = result.get("list", [])
+            if not klines:
+                logger.warning(f"[{symbol}] Пустые свечи, resp={resp}")
+            return klines
+        except Exception as e:
+            logger.exception(f"[{symbol}] Ошибка получения свечей: {e}")
+            return []
+
+    def get_last_candle(
+        self,
+        symbol: str,
+        interval: str,
+        category: str = "linear",
+    ) -> Optional[Dict[str, float]]:
+        """
+        Возвращает последнюю свечу в удобном виде.
+        """
+        klines = self._fetch_klines(symbol, interval, limit=2, category=category)
+        if not klines:
+            return None
+        # последняя свеча = первый элемент (Bybit отдаёт в обратном порядке)
+        k = klines[0]
+        # [startTime, open, high, low, close, volume, turnover]
+        return {
+            "open": float(k[1]),
+            "high": float(k[2]),
+            "low": float(k[3]),
+            "close": float(k[4]),
+            "volume": float(k[5]),
+        }
+
+    # --- RSI ---
+
+    def get_rsi(
+        self,
+        symbol: str,
+        interval: str,
+        period: int = 14,
+        category: str = "linear",
+    ) -> Optional[float]:
+        """
+        Классический RSI по закрытиям.
+        """
+        klines = self._fetch_klines(symbol, interval, limit=period + 50, category=category)
+        if len(klines) < period + 1:
+            logger.warning(f"[{symbol}] Недостаточно свечей для RSI.")
+            return None
+
+        closes = [float(k[4]) for k in reversed(klines)]  # в прямом времени
+        deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+
+        gains = [max(d, 0) for d in deltas]
+        losses = [abs(min(d, 0)) for d in deltas]
+
+        avg_gain = sum(gains[:period]) / period
+        avg_loss = sum(losses[:period]) / period
+
+        for i in range(period, len(deltas)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+
+        if avg_loss == 0:
+            return 100.0
+
+        rs = avg_gain / avg_loss
+        rsi = 100 - (100 / (1 + rs))
+        return rsi
+
+    # --- EMA ---
+
+    def get_ema(
+        self,
+        symbol: str,
+        interval: str,
+        period: int,
+        category: str = "linear",
+    ) -> Optional[float]:
+        """
+        EMA по закрытиям.
+        """
+        klines = self._fetch_klines(symbol, interval, limit=period + 50, category=category)
+        if len(klines) < period:
+            logger.warning(f"[{symbol}] Недостаточно свечей для EMA{period}.")
+            return None
+
+        closes = [float(k[4]) for k in reversed(klines)]  # в прямом времени
+
+        k = 2 / (period + 1)
+        ema = sum(closes[:period]) / period  # старт как SMA
+
+        for price in closes[period:]:
+            ema = price * k + ema * (1 - k)
+
+        return ema
+
+    # --- ATR ---
+
+    def get_atr(
+        self,
+        symbol: str,
+        interval: str,
+        period: int = 14,
+        category: str = "linear",
+    ) -> Optional[float]:
+        """
+        ATR по true range.
+        """
+        klines = self._fetch_klines(symbol, interval, limit=period + 50, category=category)
+        if len(klines) < period + 1:
+            logger.warning(f"[{symbol}] Недостаточно свечей для ATR.")
+            return None
+
+        kl = list(reversed(klines))  # по времени
+        trs = []
+        for i in range(1, len(kl)):
+            prev_close = float(kl[i - 1][4])
+            high = float(kl[i][2])
+            low = float(kl[i][3])
+
+            tr = max(
+                high - low,
+                abs(high - prev_close),
+                abs(low - prev_close),
+            )
+            trs.append(tr)
+
+        if len(trs) < period:
+            return None
+
+        atr = sum(trs[:period]) / period
+        for tr in trs[period:]:
+            atr = (atr * (period - 1) + tr) / period
+
+        return atr
+
+    # --- Volume SMA ---
+
+    def get_volume_sma(
+        self,
+        symbol: str,
+        interval: str,
+        period: int = 20,
+        category: str = "linear",
+    ) -> Optional[float]:
+        """
+        Средний объём за N свечей.
+        """
+        klines = self._fetch_klines(symbol, interval, limit=period + 5, category=category)
+        if len(klines) < period:
+            logger.warning(f"[{symbol}] Недостаточно свечей для volume SMA{period}.")
+            return None
+
+        vols = [float(k[5]) for k in klines[:period]]  # Bybit отдаёт от новой к старой
+        return sum(vols) / period
