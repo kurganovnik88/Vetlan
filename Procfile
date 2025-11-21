@@ -1,2 +1,2 @@
-web: python run_strategy.py
+worker: python run_strategy.py
 
