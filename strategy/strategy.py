@@ -106,7 +106,27 @@ class Strategy:
                     },
                 )
 
-            last_price = c[-1]
+            # Получаем текущую рыночную цену через ticker API
+            # Это более актуально, чем цена закрытия последней свечи
+            # Bybit возвращает свечи в обратном порядке: c[0] - самая новая, c[-1] - самая старая
+            try:
+                ticker_resp = self.client.get_tickers(
+                    category="linear",
+                    symbol=symbol
+                )
+                if ticker_resp.get("retCode") == 0:
+                    ticker_list = ticker_resp.get("result", {}).get("list", [])
+                    if ticker_list and len(ticker_list) > 0:
+                        last_price = float(ticker_list[0].get("lastPrice", 0))
+                        if last_price == 0:
+                            # Если lastPrice = 0, используем цену закрытия самой новой свечи
+                            last_price = c[0]  # c[0] - самая новая свеча
+                    else:
+                        last_price = c[0]  # Fallback на цену закрытия самой новой свечи
+                else:
+                    last_price = c[0]  # Fallback на цену закрытия самой новой свечи
+            except Exception:
+                last_price = c[0]  # Fallback на цену закрытия самой новой свечи
 
             # ----------------------------
             # Индикация

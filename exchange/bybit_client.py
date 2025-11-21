@@ -57,3 +57,20 @@ class BybitClient:
 
     def get_balance(self):
         return self.client.get_wallet_balance(accountType="UNIFIED")
+
+    def get_ticker_price(self, symbol):
+        """
+        Получает текущую рыночную цену (lastPrice) для символа.
+        """
+        try:
+            resp = self.client.get_tickers(
+                category="linear",
+                symbol=symbol
+            )
+            if resp.get("retCode") == 0:
+                result = resp.get("result", {}).get("list", [])
+                if result and len(result) > 0:
+                    return float(result[0].get("lastPrice", 0))
+            return None
+        except Exception as e:
+            return None
