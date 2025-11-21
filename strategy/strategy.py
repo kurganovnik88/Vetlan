@@ -34,6 +34,7 @@ class Strategy:
         self.vol_sma_period = settings.get("volume_sma", 20)
         self.atr_period = settings.get("atr_period", 14)
         self.min_vol_mult = settings.get("volume_mult", 1.0)
+        self.min_vol_mult_short = settings.get("volume_mult_short", 1.0)
 
         self.tp_long_atr = settings.get("tp_long_atr", 2.5)
         self.sl_long_atr = settings.get("sl_long_atr", 1.2)
@@ -282,8 +283,8 @@ class Strategy:
             # =====================================================
             # Изменено: RSI < 55 (избегаем перекупленности, по ТЗ)
             if self.enable_short and rsi < self.rsi_short:
-                # Проверка объёма
-                if vol_sma and v[-1] < vol_sma * self.min_vol_mult:
+                # Проверка объёма (менее строгая для SHORT для тестирования)
+                if vol_sma and v[-1] < vol_sma * self.min_vol_mult_short:
                     return (
                         symbol,
                         None,

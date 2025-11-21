@@ -59,6 +59,7 @@ BYBIT_CONFIG = {
 
     "volume_sma": 15,
     "volume_mult": 1.2,
+    "volume_mult_short": 0.8,  # Менее строгий фильтр объёма для SHORT (для тестирования)
 
     "rsi_period": 14,
 
