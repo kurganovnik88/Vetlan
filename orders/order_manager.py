@@ -48,6 +48,22 @@ class OrderManager:
             if qty < 1:
                 return 0
 
+        # Финальная проверка минимального размера ордера (после всех ограничений)
+        order_value = entry * qty
+        if order_value < self.min_order_usdt:
+            # Пытаемся увеличить qty до минимума
+            min_qty = math.ceil(self.min_order_usdt / entry)
+            # Проверяем, не превышает ли это максимальный размер
+            if min_qty <= max_qty:
+                qty = min_qty
+            else:
+                # Если даже минимальный размер превышает максимум, отменяем ордер
+                return 0
+
+        # Финальная проверка: убеждаемся, что размер ордера >= минимума
+        if entry * qty < self.min_order_usdt:
+            return 0
+
         return float(qty)
 
     # ---------------------------
