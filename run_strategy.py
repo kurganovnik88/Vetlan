@@ -212,7 +212,15 @@ def run_strategy(poll_interval: int = 30):
                             f"Entry: {entry:.6f}\nTP: {tp:.6f}\nSL: {sl:.6f}"
                         )
                 else:
-                    logger.warning("[%s] Не удалось открыть позицию", symbol)
+                    # Детальное логирование причины отказа
+                    balance = orders.get_usdt_balance()
+                    order_value = entry * orders.calc_qty(entry, sl) if orders.calc_qty(entry, sl) > 0 else 0
+                    logger.warning(
+                        "[%s] Не удалось открыть позицию. "
+                        "Возможные причины: размер позиции < минимума (%s USDT < 5 USDT) "
+                        "или баланс недостаточен (баланс: %.2f USDT)",
+                        symbol, order_value, balance
+                    )
 
             time.sleep(max(1, poll_interval))
     except KeyboardInterrupt:

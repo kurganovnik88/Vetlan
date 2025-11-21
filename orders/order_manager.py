@@ -58,10 +58,12 @@ class OrderManager:
                 qty = min_qty
             else:
                 # Если даже минимальный размер превышает максимум, отменяем ордер
+                # Это означает, что баланс слишком мал для минимального ордера
                 return 0
 
         # Финальная проверка: убеждаемся, что размер ордера >= минимума
-        if entry * qty < self.min_order_usdt:
+        final_order_value = entry * qty
+        if final_order_value < self.min_order_usdt:
             return 0
 
         return float(qty)
@@ -158,6 +160,16 @@ class OrderManager:
 
         qty = self.calc_qty(entry, sl)
         if qty <= 0:
+            # Логируем причину отказа
+            balance = self._get_usdt_balance()
+            order_value = entry * qty if qty > 0 else 0
+            import logging
+            logger = logging.getLogger("vetlan_strategy")
+            logger.warning(
+                f"[{symbol}] Не удалось рассчитать размер позиции: "
+                f"qty={qty}, entry={entry:.6f}, order_value={order_value:.2f} USDT, "
+                f"balance={balance:.2f} USDT, min_order={self.min_order_usdt} USDT"
+            )
             return False
 
         side = "Buy" if signal == "long" else "Sell"
