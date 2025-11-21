@@ -86,13 +86,17 @@ class Strategy:
 
             # ----------------------------
             # парсим OHLCV
+            # Bybit возвращает свечи в обратном порядке (от новых к старым)
+            # Переворачиваем для правильного расчета индикаторов (от старых к новым)
             # ----------------------------
             try:
-                o = np.array([float(k[1]) for k in klines], dtype=float)
-                h = np.array([float(k[2]) for k in klines], dtype=float)
-                l = np.array([float(k[3]) for k in klines], dtype=float)
-                c = np.array([float(k[4]) for k in klines], dtype=float)
-                v = np.array([float(k[5]) for k in klines], dtype=float)
+                # Переворачиваем массив свечей для хронологического порядка
+                klines_reversed = list(reversed(klines))
+                o = np.array([float(k[1]) for k in klines_reversed], dtype=float)
+                h = np.array([float(k[2]) for k in klines_reversed], dtype=float)
+                l = np.array([float(k[3]) for k in klines_reversed], dtype=float)
+                c = np.array([float(k[4]) for k in klines_reversed], dtype=float)
+                v = np.array([float(k[5]) for k in klines_reversed], dtype=float)
             except (ValueError, TypeError, IndexError) as exc:
                 return (
                     symbol,
@@ -108,7 +112,6 @@ class Strategy:
 
             # Получаем текущую рыночную цену через ticker API
             # Это более актуально, чем цена закрытия последней свечи
-            # Bybit возвращает свечи в обратном порядке: c[0] - самая новая, c[-1] - самая старая
             try:
                 ticker_resp = self.client.get_tickers(
                     category="linear",
@@ -120,16 +123,18 @@ class Strategy:
                         last_price = float(ticker_list[0].get("lastPrice", 0))
                         if last_price == 0:
                             # Если lastPrice = 0, используем цену закрытия самой новой свечи
-                            last_price = c[0]  # c[0] - самая новая свеча
+                            last_price = c[-1]  # c[-1] - самая новая свеча (после переворота)
                     else:
-                        last_price = c[0]  # Fallback на цену закрытия самой новой свечи
+                        last_price = c[-1]  # Fallback на цену закрытия самой новой свечи
                 else:
-                    last_price = c[0]  # Fallback на цену закрытия самой новой свечи
+                    last_price = c[-1]  # Fallback на цену закрытия самой новой свечи
             except Exception:
-                last_price = c[0]  # Fallback на цену закрытия самой новой свечи
+                last_price = c[-1]  # Fallback на цену закрытия самой новой свечи
 
             # ----------------------------
             # Индикация
+            # Теперь массивы в правильном порядке (от старых к новым)
+            # c[0] - самая старая свеча, c[-1] - самая новая свеча
             # ----------------------------
             rsi = calc_rsi(c, self.rsi_period)
             ema50 = calc_ema(c, self.ema_period)
